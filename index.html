@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1014">
+<title>Micro Voiture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout : une seule colonne, un énorme bouton à toucher sans regarder, réglages en dessous */
+:root{
+  --bg:#0d1014; --panel:#161b21; --line:#262e37; --fg:#e8edf2; --muted:#8a96a3;
+  --live:#ff4d3d; --ok:#3ddc84; --amber:#ffb020;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-tap-highlight-color:transparent;
+}
+main{max-width:480px;margin:0 auto;padding-block:20px 32px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;justify-content:space-between;align-items:baseline}
+h1{font:700 1.9rem/1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:0}
+.state{font:600 .78rem var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.state.on{color:var(--live)}
+
+#ptt{
+  position:relative;width:100%;aspect-ratio:1/1;max-height:62vh;max-width:100%;margin:0 auto;
+  border-radius:50%;border:3px solid var(--line);background:radial-gradient(circle at 50% 40%,#1d242c,#11161b 70%);
+  color:var(--fg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;user-select:none;touch-action:manipulation;transition:border-color .15s,box-shadow .15s;
+}
+#ptt:focus-visible{outline:3px solid var(--amber);outline-offset:4px}
+#ptt .big{font:700 3.2rem/1 var(--display);letter-spacing:.04em;text-transform:uppercase}
+#ptt .small{font-size:.9rem;color:var(--muted)}
+#ptt.on{border-color:var(--live);box-shadow:0 0 0 calc(var(--lvl,0) * 28px) rgba(255,77,61,.22),0 0 60px rgba(255,77,61,.25)}
+#ptt.on .big{color:var(--live)}
+
+.meter{height:10px;border-radius:5px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok) 0 65%,var(--amber) 65% 85%,var(--live) 85%);transition:width 60ms linear}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;flex-direction:column;gap:6px}
+.row label{display:flex;justify-content:space-between;font-weight:500}
+.row output{font-variant-numeric:tabular-nums;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--live);height:28px}
+.check{display:flex;gap:12px;align-items:flex-start;font-weight:500}
+.check input{width:22px;height:22px;accent-color:var(--live);flex:none;margin-top:1px}
+.check small{display:block;font-weight:400;color:var(--muted)}
+select{width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);font:inherit}
+
+.note{font-size:.85rem;color:var(--muted);margin:0}
+.note b{color:var(--fg)}
+.err{color:var(--live);font-weight:500;margin:0}
+.lat{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){#ptt,.meter i{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Micro Voiture</h1>
+    <span class="state" id="state">Coupé</span>
+  </header>
+
+  <button id="ptt" type="button" aria-pressed="false">
+    <span class="big" id="bigLabel">Parler</span>
+    <span class="small" id="smallLabel">Touchez pour ouvrir le micro</span>
+  </button>
+
+  <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+  <p class="err" id="err" hidden></p>
+
+  <section class="panel">
+    <div class="row">
+      <label for="gain">Volume de sortie <output id="gainOut">×2,0</output></label>
+      <input id="gain" type="range" min="0.5" max="6" step="0.1" value="2">
+    </div>
+    <div class="row">
+      <label for="mode">Mode</label>
+      <select id="mode">
+        <option value="toggle">Appui = ouvrir / fermer</option>
+        <option value="hold">Maintenir pour parler (talkie-walkie)</option>
+      </select>
+    </div>
+    <label class="check"><input id="gate" type="checkbox" checked>
+      <span>Couper le bruit de fond<small>Le son ne passe que quand tu parles (évite le souffle de la route).</small></span></label>
+    <label class="check"><input id="clean" type="checkbox" checked>
+      <span>Anti-larsen du téléphone<small>Annulation d'écho et réduction de bruit. Décoche pour un son plus naturel si ça ne siffle pas.</small></span></label>
+    <p class="note lat" id="lat">Latence estimée : —</p>
+  </section>
+
+  <p class="note"><b>Branchement :</b> connecte le téléphone à la voiture en Bluetooth ou au câble (AUX/USB), choisis la source sur l'autoradio, puis touche « Parler ». Le câble AUX donne le moins de retard ; le Bluetooth ajoute souvent 0,1 à 0,3 s d'écho.</p>
+  <p class="note"><b>Si ça siffle :</b> baisse le volume ici ou sur l'autoradio, éloigne le téléphone des haut-parleurs, ou passe en mode « maintenir pour parler ».</p>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const ptt = $('ptt'), stateEl = $('state'), meter = $('meter'), err = $('err');
+  const gainIn = $('gain'), gainOut = $('gainOut'), modeSel = $('mode'), gateCb = $('gate'), cleanCb = $('clean'), latEl = $('lat');
+
+  let ctx, stream, src, hp, comp, gate, out, analyser, raf, wakeLock, live = false;
+  const store = {
+    get(k, d){ try{ const v = localStorage.getItem('mv_'+k); return v === null ? d : JSON.parse(v); }catch{ return d; } },
+    set(k, v){ try{ localStorage.setItem('mv_'+k, JSON.stringify(v)); }catch{} }
+  };
+  gainIn.value = store.get('gain', 2); modeSel.value = store.get('mode', 'toggle');
+  gateCb.checked = store.get('gate', true); cleanCb.checked = store.get('clean', true);
+
+  const fmt = v => '×' + Number(v).toFixed(1).replace('.', ',');
+  gainOut.textContent = fmt(gainIn.value);
+  const labels = () => {
+    const hold = modeSel.value === 'hold';
+    $('bigLabel').textContent = live ? 'En direct' : 'Parler';
+    $('smallLabel').textContent = live ? (hold ? 'Relâchez pour couper' : 'Touchez pour couper')
+                                       : (hold ? 'Maintenez appuyé pour parler' : 'Touchez pour ouvrir le micro');
+  };
+  labels();
+
+  function showErr(msg){ err.textContent = msg; err.hidden = !msg; }
+
+  // Détecte les endroits où le navigateur refuse le micro sans même demander
+  let inFrame = false; try{ inFrame = window.self !== window.top; }catch{ inFrame = true; }
+  const blocked =
+    !window.isSecureContext ? "Le micro ne marche qu'en https. Ouvre cette page depuis une adresse https:// (par ex. après l'avoir déposée sur Netlify Drop)." :
+    inFrame ? "Cette page est affichée dans un cadre qui bloque le micro. Ouvre-la directement depuis son adresse https:// dans Safari ou Brave." :
+    !navigator.mediaDevices?.getUserMedia ? "Ce navigateur ne donne pas accès au micro. Essaie Safari ou une version à jour de Brave." : '';
+  if (blocked) showErr(blocked);
+
+  // Si l'autorisation a déjà été refusée, l'indiquer avant même d'appuyer
+  navigator.permissions?.query({name:'microphone'}).then(p => {
+    const upd = () => { if (p.state === 'denied') showErr("Micro refusé pour ce site. Sur iPhone : Réglages › Brave (ou Safari) › Micro, puis recharge la page."); };
+    upd(); p.onchange = upd;
+  }).catch(() => {});
+
+  async function openMic(){
+    if (!navigator.mediaDevices?.getUserMedia){
+      showErr("Ce navigateur bloque le micro. Ouvre la page en https (ou depuis Chrome) et réessaie.");
+      return false;
+    }
+    const clean = cleanCb.checked;
+    // Cet appel déclenche la fenêtre « Autoriser le micro ? » du navigateur
+    stream = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation: clean, noiseSuppression: clean, autoGainControl: false,
+      channelCount: 1
+    }});
+    await ctx.resume();
+    src = ctx.createMediaStreamSource(stream);
+    hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;  // vire le grondement moteur
+    comp = ctx.createDynamicsCompressor();                                         // évite que ça sature quand tu cries
+    comp.threshold.value = -24; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
+    gate = ctx.createGain(); gate.gain.value = 1;
+    out = ctx.createGain(); out.gain.value = +gainIn.value;
+    analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+    src.connect(hp).connect(comp).connect(gate).connect(out).connect(ctx.destination);
+    hp.connect(analyser);
+    const l = ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+    latEl.textContent = 'Latence estimée du téléphone : ' + (l ? Math.round(l) + ' ms' : 'inconnue') + ' (+ Bluetooth éventuel)';
+    return true;
+  }
+
+  function loop(){
+    const buf = new Float32Array(analyser.fftSize);
+    let open = 0;
+    const tick = () => {
+      analyser.getFloatTimeDomainData(buf);
+      let s = 0; for (const v of buf) s += v*v;
+      const rms = Math.sqrt(s / buf.length);
+      const db = 20 * Math.log10(rms + 1e-8);
+      const lvl = Math.min(1, Math.max(0, (db + 60) / 50));
+      meter.style.width = (lvl*100).toFixed(0) + '%';
+      ptt.style.setProperty('--lvl', lvl.toFixed(2));
+      if (gateCb.checked){
+        if (db > -48) open = performance.now();
+        const target = performance.now() - open < 350 ? 1 : 0.02;   // garde ouvert 350 ms après la dernière syllabe
+        gate.gain.setTargetAtTime(target, ctx.currentTime, target === 1 ? .005 : .08);
+      } else gate.gain.setTargetAtTime(1, ctx.currentTime, .01);
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+
+  async function start(){
+    if (live) return;
+    showErr('');
+    if (blocked){ showErr(blocked); return; }
+    try{
+      if (!ctx){
+        // iPhone : le moteur audio doit être créé pendant le toucher, avant tout « await »
+        ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+        ctx.resume();
+        if (!(await openMic())) return;
+      }
+      else { await ctx.resume(); }
+      out.gain.setTargetAtTime(+gainIn.value, ctx.currentTime, .01);
+      live = true; ptt.classList.add('on'); ptt.setAttribute('aria-pressed','true');
+      stateEl.textContent = 'Micro ouvert'; stateEl.classList.add('on'); labels();
+      loop();
+      try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{}
+    }catch(e){
+      showErr(e && e.name === 'NotAllowedError'
+        ? "Accès au micro refusé. Sur iPhone : Réglages › Brave (ou Safari) › active Micro, puis recharge la page et réappuie sur « Parler »."
+        : "Impossible d'ouvrir le micro : " + (e?.message || e));
+      stopAll();
+    }
+  }
+
+  function stop(){
+    if (!live) return;
+    live = false; cancelAnimationFrame(raf);
+    if (out) out.gain.setTargetAtTime(0, ctx.currentTime, .02);
+    ptt.classList.remove('on'); ptt.setAttribute('aria-pressed','false'); ptt.style.setProperty('--lvl', 0);
+    meter.style.width = '0'; stateEl.textContent = 'Coupé'; stateEl.classList.remove('on'); labels();
+    try{ wakeLock?.release(); }catch{} wakeLock = null;
+  }
+
+  function stopAll(){   // libère vraiment le micro (pour changer les réglages de capture)
+    stop();
+    stream?.getTracks().forEach(t => t.stop());
+    try{ ctx?.close(); }catch{}
+    ctx = stream = null;
+  }
+
+  // Interactions
+  ptt.addEventListener('click', () => { if (modeSel.value === 'toggle') live ? stop() : start(); });
+  ptt.addEventListener('pointerdown', e => { if (modeSel.value === 'hold'){ e.preventDefault(); ptt.setPointerCapture(e.pointerId); start(); } });
+  ['pointerup','pointercancel'].forEach(t => ptt.addEventListener(t, () => { if (modeSel.value === 'hold') stop(); }));
+  ptt.addEventListener('contextmenu', e => e.preventDefault());
+
+  gainIn.addEventListener('input', () => {
+    gainOut.textContent = fmt(gainIn.value); store.set('gain', +gainIn.value);
+    if (live && out) out.gain.setTargetAtTime(+gainIn.value, ctx.currentTime, .02);
+  });
+  modeSel.addEventListener('change', () => { store.set('mode', modeSel.value); stop(); labels(); });
+  gateCb.addEventListener('change', () => store.set('gate', gateCb.checked));
+  cleanCb.addEventListener('change', () => { store.set('clean', cleanCb.checked); const was = live; stopAll(); if (was) start(); });
+
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && live){
+      try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{}
+    }
+  });
+})();
+</script>
+</body>
+</html>
