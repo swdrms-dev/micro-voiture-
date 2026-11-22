@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
 <style>
-/* Layout : une seule colonne, un énorme bouton à toucher sans regarder, réglages en dessous */
+/* Layout : une colonne, un énorme bouton utilisable sans regarder, puis réglages du son et effets */
 :root{
   --bg:#0d1014; --panel:#161b21; --line:#262e37; --fg:#e8edf2; --muted:#8a96a3;
   --live:#ff4d3d; --ok:#3ddc84; --amber:#ffb020;
@@ -17,28 +17,31 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
+[hidden]{display:none!important}
+html,body{margin:0}
 body{
   background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   -webkit-tap-highlight-color:transparent;
 }
-main{max-width:480px;margin:0 auto;padding-block:20px 32px;display:flex;flex-direction:column;gap:22px}
+main{max-width:480px;margin:0 auto;padding-block:20px 32px;display:flex;flex-direction:column;gap:20px}
 header{display:flex;justify-content:space-between;align-items:baseline}
 h1{font:700 1.9rem/1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:0}
+h2{font:700 1.15rem/1 var(--display);letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--muted)}
 .state{font:600 .78rem var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .state.on{color:var(--live)}
 
 #ptt{
-  position:relative;width:100%;aspect-ratio:1/1;max-height:62vh;max-width:100%;margin:0 auto;
+  position:relative;width:min(100%,52vh);aspect-ratio:1/1;max-width:100%;margin:0 auto;
   border-radius:50%;border:3px solid var(--line);background:radial-gradient(circle at 50% 40%,#1d242c,#11161b 70%);
   color:var(--fg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-  cursor:pointer;user-select:none;touch-action:manipulation;transition:border-color .15s,box-shadow .15s;
+  cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;transition:border-color .15s,box-shadow .15s;
 }
 #ptt:focus-visible{outline:3px solid var(--amber);outline-offset:4px}
 #ptt .big{font:700 3.2rem/1 var(--display);letter-spacing:.04em;text-transform:uppercase}
-#ptt .small{font-size:.9rem;color:var(--muted)}
+#ptt .small{font-size:.9rem;color:var(--muted);text-align:center;padding:0 12px}
+#ptt .fxname{font:600 .75rem var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--amber);min-height:1.2em}
 #ptt.on{border-color:var(--live);box-shadow:0 0 0 calc(var(--lvl,0) * 28px) rgba(255,77,61,.22),0 0 60px rgba(255,77,61,.25)}
 #ptt.on .big{color:var(--live)}
 
@@ -47,18 +50,26 @@ h1{font:700 1.9rem/1 var(--display);letter-spacing:.02em;text-transform:uppercas
 
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:16px}
 .row{display:flex;flex-direction:column;gap:6px}
-.row label{display:flex;justify-content:space-between;font-weight:500}
-.row output{font-variant-numeric:tabular-nums;color:var(--muted)}
+.row > label{display:flex;justify-content:space-between;gap:12px;font-weight:500}
+.row output{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 input[type=range]{width:100%;accent-color:var(--live);height:28px}
 .check{display:flex;gap:12px;align-items:flex-start;font-weight:500}
 .check input{width:22px;height:22px;accent-color:var(--live);flex:none;margin-top:1px}
-.check small{display:block;font-weight:400;color:var(--muted)}
+.check small,.hint{display:block;font-weight:400;color:var(--muted);font-size:.85rem}
 select{width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);font:inherit}
+
+.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chip{
+  padding:12px 6px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);
+  font:600 .9rem var(--body);cursor:pointer;touch-action:manipulation;
+}
+.chip[aria-pressed="true"]{border-color:var(--amber);color:var(--amber);background:rgba(255,176,32,.08)}
+.chip:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 
 .note{font-size:.85rem;color:var(--muted);margin:0}
 .note b{color:var(--fg)}
 .err{color:var(--live);font-weight:500;margin:0}
-.lat{font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){#ptt,.meter i{transition:none}}
 </style>
 </head>
@@ -70,6 +81,7 @@ select{width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var
   </header>
 
   <button id="ptt" type="button" aria-pressed="false">
+    <span class="fxname" id="fxName"></span>
     <span class="big" id="bigLabel">Parler</span>
     <span class="small" id="smallLabel">Touchez pour ouvrir le micro</span>
   </button>
@@ -77,111 +89,379 @@ select{width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var
   <div class="meter" aria-hidden="true"><i id="meter"></i></div>
   <p class="err" id="err" hidden></p>
 
-  <section class="panel">
+  <section class="panel" aria-labelledby="fxTitle">
+    <h2 id="fxTitle">Effets de voix</h2>
+    <div class="chips" id="chips">
+      <button class="chip" type="button" data-fx="none">Normal</button>
+      <button class="chip" type="button" data-fx="tune">Auto-tune</button>
+      <button class="chip" type="button" data-fx="robot">Robot</button>
+      <button class="chip" type="button" data-fx="low">Voix grave</button>
+      <button class="chip" type="button" data-fx="high">Voix aiguë</button>
+      <button class="chip" type="button" data-fx="mega">Mégaphone</button>
+      <button class="chip" type="button" data-fx="radio">Talkie</button>
+      <button class="chip" type="button" data-fx="echo">Écho</button>
+      <button class="chip" type="button" data-fx="stade">Stade</button>
+    </div>
+
+    <div class="pair" id="rowKey" hidden>
+      <div class="row">
+        <label for="key">Tonalité</label>
+        <select id="key">
+          <option value="0">Do</option><option value="1">Do♯</option><option value="2">Ré</option>
+          <option value="3">Mi♭</option><option value="4">Mi</option><option value="5">Fa</option>
+          <option value="6">Fa♯</option><option value="7">Sol</option><option value="8">La♭</option>
+          <option value="9">La</option><option value="10">Si♭</option><option value="11">Si</option>
+        </select>
+      </div>
+      <div class="row" id="rowScale">
+        <label for="scale">Gamme</label>
+        <select id="scale">
+          <option value="major">Majeure</option>
+          <option value="minor">Mineure</option>
+          <option value="chromatic">Toutes les notes</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" id="rowSpeed" hidden>
+      <label for="speed">Effet <output id="speedOut"></output></label>
+      <input id="speed" type="range" min="0" max="100" step="1" value="85">
+      <span class="hint">À fond : effet robotique façon rap. Plus bas : correction discrète.</span>
+    </div>
+    <div class="row" id="rowShift" hidden>
+      <label for="shift">Hauteur <output id="shiftOut"></output></label>
+      <input id="shift" type="range" min="-12" max="12" step="1" value="0">
+    </div>
+    <div class="row" id="rowAmount" hidden>
+      <label for="amount">Intensité <output id="amountOut"></output></label>
+      <input id="amount" type="range" min="0" max="100" step="1" value="50">
+    </div>
+    <p class="note" id="fxNote" hidden></p>
+  </section>
+
+  <section class="panel" aria-labelledby="soundTitle">
+    <h2 id="soundTitle">Son</h2>
     <div class="row">
       <label for="gain">Volume de sortie <output id="gainOut">×2,0</output></label>
       <input id="gain" type="range" min="0.5" max="6" step="0.1" value="2">
     </div>
     <div class="row">
-      <label for="mode">Mode</label>
+      <label for="profile">Haut-parleurs</label>
+      <select id="profile">
+        <option value="polo">Polo 4 (9N3), HP d'origine</option>
+        <option value="neutral">Neutre / autre voiture</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="hpf">Coupe des basses <output id="hpfOut"></output></label>
+      <input id="hpf" type="range" min="70" max="250" step="5" value="150">
+      <span class="hint">Monte si ça grésille ou si les portières vibrent.</span>
+    </div>
+    <div class="row">
+      <label for="presence">Clarté de la voix <output id="presenceOut"></output></label>
+      <input id="presence" type="range" min="0" max="8" step="0.5" value="3">
+    </div>
+    <div class="row">
+      <label for="mode">Bouton</label>
       <select id="mode">
         <option value="toggle">Appui = ouvrir / fermer</option>
         <option value="hold">Maintenir pour parler (talkie-walkie)</option>
       </select>
     </div>
     <label class="check"><input id="gate" type="checkbox" checked>
-      <span>Couper le bruit de fond<small>Le son ne passe que quand tu parles (évite le souffle de la route).</small></span></label>
+      <span>Couper le bruit de fond<small>Le son ne passe que quand tu parles.</small></span></label>
     <label class="check"><input id="clean" type="checkbox" checked>
       <span>Anti-larsen du téléphone<small>Annulation d'écho et réduction de bruit. Décoche pour un son plus naturel si ça ne siffle pas.</small></span></label>
-    <p class="note lat" id="lat">Latence estimée : —</p>
+    <p class="note" id="lat">Latence estimée : —</p>
   </section>
 
-  <p class="note"><b>Branchement :</b> connecte le téléphone à la voiture en Bluetooth ou au câble (AUX/USB), choisis la source sur l'autoradio, puis touche « Parler ». Le câble AUX donne le moins de retard ; le Bluetooth ajoute souvent 0,1 à 0,3 s d'écho.</p>
-  <p class="note"><b>Si ça siffle :</b> baisse le volume ici ou sur l'autoradio, éloigne le téléphone des haut-parleurs, ou passe en mode « maintenir pour parler ».</p>
+  <p class="note"><b>Branchement :</b> connecte le téléphone en Bluetooth ou au câble AUX, choisis la source sur l'autoradio, puis touche « Parler ». Le câble donne le moins de retard ; le Bluetooth ajoute souvent 0,1 à 0,3 s.</p>
+  <p class="note"><b>Si ça siffle :</b> baisse le volume, éloigne le téléphone des haut-parleurs ou passe en « maintenir pour parler ». Les effets Écho et Stade sifflent plus facilement.</p>
 </main>
 
 <script>
+/* ---------- Processeur audio (auto-tune, robot, changement de hauteur) ---------- */
+const WORKLET = `
+class VoiceFX extends AudioWorkletProcessor {
+  constructor(){
+    super();
+    this.mode = 'none'; this.key = 0; this.scale = 'major'; this.tau = 0.02; this.shift = 0;
+    this.port.onmessage = e => Object.assign(this, e.data);
+    // Tampon du décaleur de hauteur
+    this.N = 16384; this.buf = new Float32Array(this.N); this.w = 0;
+    this.W = Math.round(sampleRate * 0.032); this.ph = 0; this.ratio = 1; this.corr = 1;
+    // Détection de la note chantée (sous-échantillonnée par 2)
+    this.dsr = sampleRate / 2; this.F = 1024; this.ds = new Float32Array(this.F); this.di = 0; this.dc = 0; this.half = 0; this.hasHalf = false;
+    this.frame = new Float32Array(this.F); this.diff = new Float32Array(this.F / 2);
+    this.tMin = Math.floor(this.dsr / 1000); this.tMax = Math.min(Math.floor(this.dsr / 70), this.F / 2 - 1);
+  }
+  detect(){
+    const F = this.F, x = this.frame, W = F / 2;
+    for (let i = 0; i < F; i++) x[i] = this.ds[(this.di + i) % F];
+    let e = 0; for (let i = 0; i < W; i++) e += x[i] * x[i];
+    if (Math.sqrt(e / W) < 0.008) return 0;
+    const d = this.diff; let run = 0; d[0] = 1;
+    for (let t = 1; t <= this.tMax; t++){
+      let s = 0; for (let j = 0; j < W; j++){ const v = x[j] - x[j + t]; s += v * v; }
+      run += s; d[t] = run > 0 ? s * t / run : 1;
+    }
+    for (let t = this.tMin; t < this.tMax; t++){
+      if (d[t] < 0.15){
+        while (t + 1 < this.tMax && d[t + 1] < d[t]) t++;
+        const a = d[t - 1], b = d[t], c = d[t + 1], den = a + c - 2 * b;
+        const tt = den ? t + (a - c) / (2 * den) : t;
+        return this.dsr / tt;
+      }
+    }
+    return 0;
+  }
+  target(midi){
+    if (this.mode === 'robot'){
+      let n = Math.round((midi - this.key) / 12) * 12 + this.key; return n;
+    }
+    const sc = this.scale === 'minor' ? [0,2,3,5,7,8,10] : this.scale === 'chromatic' ? [0,1,2,3,4,5,6,7,8,9,10,11] : [0,2,4,5,7,9,11];
+    let best = midi, bd = 99;
+    for (let o = -1; o <= 1; o++) for (const s of sc){
+      const n = (Math.floor(midi / 12) + o) * 12 + ((s + this.key) % 12);
+      const dd = Math.abs(n - midi); if (dd < bd){ bd = dd; best = n; }
+    }
+    return best;
+  }
+  process(inputs, outputs){
+    const inp = inputs[0][0], out = outputs[0][0];
+    if (!out) return true;
+    if (!inp){ out.fill(0); return true; }
+    const tune = this.mode === 'tune' || this.mode === 'robot';
+    if (!tune && this.shift === 0 && Math.abs(this.ratio - 1) < 1e-4){ out.set(inp); this.ratio = 1; return true; }
+    // Analyse de hauteur
+    if (tune){
+      for (let i = 0; i < inp.length; i++){
+        if (!this.hasHalf){ this.half = inp[i]; this.hasHalf = true; continue; }
+        this.ds[this.di] = (this.half + inp[i]) * 0.5; this.di = (this.di + 1) % this.F; this.hasHalf = false;
+        if (++this.dc >= 256){
+          this.dc = 0; const f = this.detect();
+          if (f > 0){ const m = 69 + 12 * Math.log2(f / 440); this.goal = Math.pow(2, (this.target(m) - m) / 12); }
+          else this.goal = 1;
+        }
+      }
+      const a = 1 - Math.exp(-inp.length / sampleRate / Math.max(0.001, this.tau));
+      this.corr += ((this.goal || 1) - this.corr) * a;
+    } else this.corr += (1 - this.corr) * 0.2;
+    const want = this.corr * Math.pow(2, this.shift / 12);
+    this.ratio += (want - this.ratio) * 0.5;
+    // Décaleur de hauteur à deux têtes de lecture croisées
+    const N = this.N, W = this.W, buf = this.buf, step = (1 - this.ratio) / W;
+    for (let i = 0; i < inp.length; i++){
+      buf[this.w] = inp[i];
+      this.ph += step; if (this.ph >= 1) this.ph -= 1; else if (this.ph < 0) this.ph += 1;
+      let p2 = this.ph + 0.5; if (p2 >= 1) p2 -= 1;
+      const r = (p) => { const dl = p * W + 2; let pos = this.w - dl; while (pos < 0) pos += N; const i0 = pos | 0, fr = pos - i0; return buf[i0] + (buf[(i0 + 1) % N] - buf[i0]) * fr; };
+      const g1 = Math.sin(Math.PI * this.ph); const g2 = Math.sin(Math.PI * p2);
+      out[i] = r(this.ph) * g1 * g1 + r(p2) * g2 * g2;
+      this.w = (this.w + 1) % N;
+    }
+    return true;
+  }
+}
+registerProcessor('voice-fx', VoiceFX);
+`;
+
 (() => {
   const $ = id => document.getElementById(id);
   const ptt = $('ptt'), stateEl = $('state'), meter = $('meter'), err = $('err');
-  const gainIn = $('gain'), gainOut = $('gainOut'), modeSel = $('mode'), gateCb = $('gate'), cleanCb = $('clean'), latEl = $('lat');
+  const ui = {
+    gain: $('gain'), profile: $('profile'), hpf: $('hpf'), presence: $('presence'), mode: $('mode'),
+    gate: $('gate'), clean: $('clean'), key: $('key'), scale: $('scale'), speed: $('speed'), shift: $('shift'), amount: $('amount')
+  };
+  const FX = {
+    none:  {label:'',            rows:[]},
+    tune:  {label:'Auto-tune',   rows:['rowKey','rowScale','rowSpeed']},
+    robot: {label:'Robot',       rows:['rowKey']},
+    low:   {label:'Voix grave',  rows:['rowShift'], shift:-5},
+    high:  {label:'Voix aiguë',  rows:['rowShift'], shift:6},
+    mega:  {label:'Mégaphone',   rows:['rowAmount'], amount:70},
+    radio: {label:'Talkie',      rows:['rowAmount'], amount:80},
+    echo:  {label:'Écho',        rows:['rowAmount'], amount:45},
+    stade: {label:'Stade',       rows:['rowAmount'], amount:50}
+  };
+  // Réglages pensés pour les haut-parleurs de portière 16,5 cm d'origine de la Polo 9N3 :
+  // peu de vraies basses, résonance de portière vers 200-250 Hz, aigus un peu durs vers 7 kHz.
+  const PROFILES = {
+    polo:    {hpf:150, box:-4,  presence:3, harsh:-2.5, lp:10000},
+    neutral: {hpf:80,  box:0,   presence:1, harsh:0,    lp:16000}
+  };
 
-  let ctx, stream, src, hp, comp, gate, out, analyser, raf, wakeLock, live = false;
   const store = {
     get(k, d){ try{ const v = localStorage.getItem('mv_'+k); return v === null ? d : JSON.parse(v); }catch{ return d; } },
     set(k, v){ try{ localStorage.setItem('mv_'+k, JSON.stringify(v)); }catch{} }
   };
-  gainIn.value = store.get('gain', 2); modeSel.value = store.get('mode', 'toggle');
-  gateCb.checked = store.get('gate', true); cleanCb.checked = store.get('clean', true);
+  for (const [k, el] of Object.entries(ui)){
+    const v = store.get(k, null); if (v === null) continue;
+    if (el.type === 'checkbox') el.checked = v; else el.value = v;
+  }
+  let fx = store.get('fx', 'none'); if (!FX[fx]) fx = 'none';
 
-  const fmt = v => '×' + Number(v).toFixed(1).replace('.', ',');
-  gainOut.textContent = fmt(gainIn.value);
-  const labels = () => {
-    const hold = modeSel.value === 'hold';
-    $('bigLabel').textContent = live ? 'En direct' : 'Parler';
-    $('smallLabel').textContent = live ? (hold ? 'Relâchez pour couper' : 'Touchez pour couper')
-                                       : (hold ? 'Maintenez appuyé pour parler' : 'Touchez pour ouvrir le micro');
-  };
-  labels();
+  let ctx, stream, n = {}, raf, wakeLock, live = false, workletOK = false;
 
   function showErr(msg){ err.textContent = msg; err.hidden = !msg; }
 
-  // Détecte les endroits où le navigateur refuse le micro sans même demander
+  // Endroits où le navigateur refuse le micro sans demander
   let inFrame = false; try{ inFrame = window.self !== window.top; }catch{ inFrame = true; }
   const blocked =
-    !window.isSecureContext ? "Le micro ne marche qu'en https. Ouvre cette page depuis une adresse https:// (par ex. après l'avoir déposée sur Netlify Drop)." :
+    !window.isSecureContext ? "Le micro ne marche qu'en https. Ouvre cette page depuis son adresse https://." :
     inFrame ? "Cette page est affichée dans un cadre qui bloque le micro. Ouvre-la directement depuis son adresse https:// dans Safari ou Brave." :
     !navigator.mediaDevices?.getUserMedia ? "Ce navigateur ne donne pas accès au micro. Essaie Safari ou une version à jour de Brave." : '';
   if (blocked) showErr(blocked);
-
-  // Si l'autorisation a déjà été refusée, l'indiquer avant même d'appuyer
   navigator.permissions?.query({name:'microphone'}).then(p => {
     const upd = () => { if (p.state === 'denied') showErr("Micro refusé pour ce site. Sur iPhone : Réglages › Brave (ou Safari) › Micro, puis recharge la page."); };
     upd(); p.onchange = upd;
   }).catch(() => {});
 
-  async function openMic(){
-    if (!navigator.mediaDevices?.getUserMedia){
-      showErr("Ce navigateur bloque le micro. Ouvre la page en https (ou depuis Chrome) et réessaie.");
-      return false;
-    }
-    const clean = cleanCb.checked;
-    // Cet appel déclenche la fenêtre « Autoriser le micro ? » du navigateur
-    stream = await navigator.mediaDevices.getUserMedia({audio:{
-      echoCancellation: clean, noiseSuppression: clean, autoGainControl: false,
-      channelCount: 1
-    }});
-    await ctx.resume();
-    src = ctx.createMediaStreamSource(stream);
-    hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;  // vire le grondement moteur
-    comp = ctx.createDynamicsCompressor();                                         // évite que ça sature quand tu cries
-    comp.threshold.value = -24; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
-    gate = ctx.createGain(); gate.gain.value = 1;
-    out = ctx.createGain(); out.gain.value = +gainIn.value;
-    analyser = ctx.createAnalyser(); analyser.fftSize = 512;
-    src.connect(hp).connect(comp).connect(gate).connect(out).connect(ctx.destination);
-    hp.connect(analyser);
-    const l = ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
-    latEl.textContent = 'Latence estimée du téléphone : ' + (l ? Math.round(l) + ' ms' : 'inconnue') + ' (+ Bluetooth éventuel)';
-    return true;
+  /* ---------- Affichage ---------- */
+  const fmtX = v => '×' + Number(v).toFixed(1).replace('.', ',');
+  function refreshLabels(){
+    $('gainOut').textContent = fmtX(ui.gain.value);
+    $('hpfOut').textContent = ui.hpf.value + ' Hz';
+    $('presenceOut').textContent = '+' + String(ui.presence.value).replace('.', ',') + ' dB';
+    const s = +ui.shift.value; $('shiftOut').textContent = (s > 0 ? '+' : '') + s + ' demi-ton' + (Math.abs(s) > 1 ? 's' : '');
+    const sp = +ui.speed.value; $('speedOut').textContent = sp >= 80 ? 'robotique' : sp >= 45 ? 'marqué' : 'discret';
+    $('amountOut').textContent = ui.amount.value + ' %';
+    const hold = ui.mode.value === 'hold';
+    $('bigLabel').textContent = live ? 'En direct' : 'Parler';
+    $('smallLabel').textContent = live ? (hold ? 'Relâchez pour couper' : 'Touchez pour couper')
+                                       : (hold ? 'Maintenez appuyé pour parler' : 'Touchez pour ouvrir le micro');
+    $('fxName').textContent = FX[fx].label;
+  }
+  function refreshFxUI(){
+    document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.fx === fx));
+    ['rowKey','rowScale','rowSpeed','rowShift','rowAmount'].forEach(id => $(id).hidden = !FX[fx].rows.includes(id));
+    if (FX[fx].rows.includes('rowScale')) $('rowKey').hidden = false;
+    const note = $('fxNote');
+    const pitchFx = ['tune','robot','low','high'].includes(fx);
+    note.hidden = !(pitchFx || fx === 'echo' || fx === 'stade');
+    note.textContent = pitchFx
+      ? (ctx && !workletOK ? "Cet effet ne marche pas sur ce navigateur. Mets à jour iOS ou essaie Safari." : "Cet effet ajoute environ 30 ms de retard.")
+      : "Baisse un peu le volume avec cet effet pour éviter le sifflement.";
+    refreshLabels();
   }
 
+  /* ---------- Chaîne audio ---------- */
+  function curve(fn){ const c = new Float32Array(2048); for (let i = 0; i < 2048; i++){ const x = i / 1023.5 - 1; c[i] = fn(x); } return c; }
+  function impulse(sec, decay){
+    const len = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++){ const d = b.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay); }
+    return b;
+  }
+  const biq = (type, f, q, g) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q != null) b.Q.value = q; if (g != null) b.gain.value = g; return b; };
+  const gn = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
+  const set = (param, v, t = 0.03) => param.setTargetAtTime(v, ctx.currentTime, t);
+
+  async function build(){
+    const clean = ui.clean.checked;
+    stream = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation: clean, noiseSuppression: clean, autoGainControl: false, channelCount: 1
+    }});
+    await ctx.resume();
+    n.src = ctx.createMediaStreamSource(stream);
+    // Égalisation de la voix pour les haut-parleurs (coupe-bas 24 dB/oct + corrections)
+    n.hp1 = biq('highpass', 150, 0.541); n.hp2 = biq('highpass', 150, 1.307);
+    n.box = biq('peaking', 230, 1.0, 0);
+    n.pres = biq('peaking', 3200, 0.8, 0);
+    n.harsh = biq('peaking', 7000, 2.0, 0);
+    n.lp = biq('lowpass', 10000, 0.707);
+    n.gate = gn(1);
+    n.analyser = ctx.createAnalyser(); n.analyser.fftSize = 512;
+    n.src.connect(n.hp1).connect(n.hp2).connect(n.box).connect(n.pres).connect(n.harsh).connect(n.lp).connect(n.gate);
+    n.hp2.connect(n.analyser);
+
+    // Effets de hauteur
+    let pitchOut = n.gate;
+    try{
+      const url = URL.createObjectURL(new Blob([WORKLET], {type:'application/javascript'}));
+      await ctx.audioWorklet.addModule(url);
+      n.fx = new AudioWorkletNode(ctx, 'voice-fx', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[1]});
+      n.gate.connect(n.fx); pitchOut = n.fx; workletOK = true;
+    }catch(e){ workletOK = false; }
+
+    // Couleurs : son direct, mégaphone, talkie
+    n.dry = gn(1);
+    n.megaIn = gn(0); const mBp = biq('bandpass', 1600, 1.1), mSh = ctx.createWaveShaper(), mLp = biq('lowpass', 4500, 0.7);
+    mSh.curve = curve(x => Math.tanh(x * 6) * 0.6); mSh.oversample = '2x';
+    n.radioIn = gn(0); const rHp = biq('highpass', 450, 0.9), rLp = biq('lowpass', 2800, 0.9), rSh = ctx.createWaveShaper(), rMid = biq('peaking', 1400, 1.2, 6);
+    rSh.curve = curve(x => Math.max(-0.5, Math.min(0.5, x * 3))); rSh.oversample = '2x';
+    n.mix = gn(1);
+    pitchOut.connect(n.dry).connect(n.mix);
+    pitchOut.connect(n.megaIn); n.megaIn.connect(mBp).connect(mSh).connect(mLp).connect(n.mix);
+    pitchOut.connect(n.radioIn); n.radioIn.connect(rHp).connect(rMid).connect(rSh).connect(rLp).connect(n.mix);
+
+    // Écho et réverbération de stade (envois)
+    n.echoSend = gn(0); n.delay = ctx.createDelay(1.5); n.delay.delayTime.value = 0.32;
+    n.fb = gn(0.38); const eLp = biq('lowpass', 3000, 0.7);
+    n.mix.connect(n.echoSend).connect(n.delay).connect(eLp).connect(n.fb).connect(n.delay);
+    n.revSend = gn(0); n.conv = ctx.createConvolver(); n.conv.buffer = impulse(2.6, 3);
+    n.mix.connect(n.revSend).connect(n.conv);
+
+    // Compression, volume, limiteur anti-saturation
+    n.comp = ctx.createDynamicsCompressor();
+    n.comp.threshold.value = -26; n.comp.knee.value = 10; n.comp.ratio.value = 4; n.comp.attack.value = 0.003; n.comp.release.value = 0.15;
+    n.out = gn(+ui.gain.value);
+    n.lim = ctx.createDynamicsCompressor();
+    n.lim.threshold.value = -6; n.lim.knee.value = 0; n.lim.ratio.value = 20; n.lim.attack.value = 0.001; n.lim.release.value = 0.08;
+    n.clip = ctx.createWaveShaper(); n.clip.curve = curve(x => Math.tanh(x * 1.2) / Math.tanh(1.2));
+    n.mix.connect(n.comp); eLp.connect(n.comp); n.conv.connect(n.comp);
+    n.comp.connect(n.out).connect(n.lim).connect(n.clip).connect(ctx.destination);
+
+    applySound(); applyFx();
+    const l = ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+    $('lat').textContent = 'Latence estimée du téléphone : ' + (l ? Math.round(l) + ' ms' : 'inconnue') + ' (+ Bluetooth éventuel)';
+    refreshFxUI();
+  }
+
+  function applySound(){
+    if (!ctx || !n.hp1) return;
+    const p = PROFILES[ui.profile.value] || PROFILES.polo, f = +ui.hpf.value;
+    set(n.hp1.frequency, f); set(n.hp2.frequency, f);
+    set(n.box.gain, p.box); set(n.pres.gain, +ui.presence.value); set(n.harsh.gain, p.harsh); set(n.lp.frequency, p.lp);
+    if (live) set(n.out.gain, +ui.gain.value);
+  }
+
+  function applyFx(){
+    if (!ctx || !n.mix) return;
+    const a = +ui.amount.value / 100;
+    const megaOn = fx === 'mega', radioOn = fx === 'radio';
+    set(n.dry.gain, megaOn ? 1 - a : radioOn ? 1 - a : 1);
+    set(n.megaIn.gain, megaOn ? a * 1.4 : 0);
+    set(n.radioIn.gain, radioOn ? a * 1.4 : 0);
+    set(n.echoSend.gain, fx === 'echo' ? a * 0.9 : fx === 'stade' ? a * 0.25 : 0);
+    set(n.fb.gain, fx === 'stade' ? 0.2 : 0.38);
+    n.delay.delayTime.setValueAtTime(fx === 'stade' ? 0.12 : 0.32, ctx.currentTime);
+    set(n.revSend.gain, fx === 'stade' ? a * 0.9 : 0);
+    if (n.fx){
+      const sp = +ui.speed.value / 100;
+      n.fx.port.postMessage({
+        mode: fx === 'tune' ? 'tune' : fx === 'robot' ? 'robot' : 'none',
+        key: +ui.key.value, scale: ui.scale.value,
+        tau: fx === 'robot' ? 0.002 : 0.002 + 0.25 * Math.pow(1 - sp, 2),
+        shift: (fx === 'low' || fx === 'high') ? +ui.shift.value : 0
+      });
+    }
+  }
+
+  /* ---------- Micro on/off ---------- */
   function loop(){
-    const buf = new Float32Array(analyser.fftSize);
+    const buf = new Float32Array(n.analyser.fftSize);
     let open = 0;
     const tick = () => {
-      analyser.getFloatTimeDomainData(buf);
-      let s = 0; for (const v of buf) s += v*v;
-      const rms = Math.sqrt(s / buf.length);
-      const db = 20 * Math.log10(rms + 1e-8);
+      n.analyser.getFloatTimeDomainData(buf);
+      let s = 0; for (const v of buf) s += v * v;
+      const db = 20 * Math.log10(Math.sqrt(s / buf.length) + 1e-8);
       const lvl = Math.min(1, Math.max(0, (db + 60) / 50));
-      meter.style.width = (lvl*100).toFixed(0) + '%';
+      meter.style.width = (lvl * 100).toFixed(0) + '%';
       ptt.style.setProperty('--lvl', lvl.toFixed(2));
-      if (gateCb.checked){
+      if (ui.gate.checked){
         if (db > -48) open = performance.now();
-        const target = performance.now() - open < 350 ? 1 : 0.02;   // garde ouvert 350 ms après la dernière syllabe
-        gate.gain.setTargetAtTime(target, ctx.currentTime, target === 1 ? .005 : .08);
-      } else gate.gain.setTargetAtTime(1, ctx.currentTime, .01);
+        const target = performance.now() - open < 350 ? 1 : 0.02;
+        n.gate.gain.setTargetAtTime(target, ctx.currentTime, target === 1 ? .005 : .08);
+      } else n.gate.gain.setTargetAtTime(1, ctx.currentTime, .01);
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -196,12 +476,11 @@ select{width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var
         // iPhone : le moteur audio doit être créé pendant le toucher, avant tout « await »
         ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
         ctx.resume();
-        if (!(await openMic())) return;
-      }
-      else { await ctx.resume(); }
-      out.gain.setTargetAtTime(+gainIn.value, ctx.currentTime, .01);
+        await build();   // déclenche la demande « Autoriser le micro ? »
+      } else await ctx.resume();
+      set(n.out.gain, +ui.gain.value, .01);
       live = true; ptt.classList.add('on'); ptt.setAttribute('aria-pressed','true');
-      stateEl.textContent = 'Micro ouvert'; stateEl.classList.add('on'); labels();
+      stateEl.textContent = 'Micro ouvert'; stateEl.classList.add('on'); refreshLabels();
       loop();
       try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{}
     }catch(e){
@@ -215,38 +494,50 @@ select{width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var
   function stop(){
     if (!live) return;
     live = false; cancelAnimationFrame(raf);
-    if (out) out.gain.setTargetAtTime(0, ctx.currentTime, .02);
+    if (n.out) set(n.out.gain, 0, .02);
     ptt.classList.remove('on'); ptt.setAttribute('aria-pressed','false'); ptt.style.setProperty('--lvl', 0);
-    meter.style.width = '0'; stateEl.textContent = 'Coupé'; stateEl.classList.remove('on'); labels();
+    meter.style.width = '0'; stateEl.textContent = 'Coupé'; stateEl.classList.remove('on'); refreshLabels();
     try{ wakeLock?.release(); }catch{} wakeLock = null;
   }
 
-  function stopAll(){   // libère vraiment le micro (pour changer les réglages de capture)
+  function stopAll(){
     stop();
     stream?.getTracks().forEach(t => t.stop());
     try{ ctx?.close(); }catch{}
-    ctx = stream = null;
+    ctx = stream = null; n = {};
   }
 
-  // Interactions
-  ptt.addEventListener('click', () => { if (modeSel.value === 'toggle') live ? stop() : start(); });
-  ptt.addEventListener('pointerdown', e => { if (modeSel.value === 'hold'){ e.preventDefault(); ptt.setPointerCapture(e.pointerId); start(); } });
-  ['pointerup','pointercancel'].forEach(t => ptt.addEventListener(t, () => { if (modeSel.value === 'hold') stop(); }));
+  /* ---------- Interactions ---------- */
+  ptt.addEventListener('click', () => { if (ui.mode.value === 'toggle') live ? stop() : start(); });
+  ptt.addEventListener('pointerdown', e => { if (ui.mode.value === 'hold'){ e.preventDefault(); try{ ptt.setPointerCapture(e.pointerId); }catch{} start(); } });
+  ['pointerup','pointercancel'].forEach(t => ptt.addEventListener(t, () => { if (ui.mode.value === 'hold') stop(); }));
   ptt.addEventListener('contextmenu', e => e.preventDefault());
 
-  gainIn.addEventListener('input', () => {
-    gainOut.textContent = fmt(gainIn.value); store.set('gain', +gainIn.value);
-    if (live && out) out.gain.setTargetAtTime(+gainIn.value, ctx.currentTime, .02);
+  $('chips').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    fx = c.dataset.fx; store.set('fx', fx);
+    if (FX[fx].shift != null){ ui.shift.value = FX[fx].shift; store.set('shift', +ui.shift.value); }
+    if (FX[fx].amount != null){ ui.amount.value = FX[fx].amount; store.set('amount', +ui.amount.value); }
+    refreshFxUI(); applyFx();
   });
-  modeSel.addEventListener('change', () => { store.set('mode', modeSel.value); stop(); labels(); });
-  gateCb.addEventListener('change', () => store.set('gate', gateCb.checked));
-  cleanCb.addEventListener('change', () => { store.set('clean', cleanCb.checked); const was = live; stopAll(); if (was) start(); });
+
+  ui.profile.addEventListener('change', () => {
+    const p = PROFILES[ui.profile.value];
+    ui.hpf.value = p.hpf; ui.presence.value = p.presence;
+    store.set('profile', ui.profile.value); store.set('hpf', p.hpf); store.set('presence', p.presence);
+    refreshLabels(); applySound();
+  });
+  for (const k of ['gain','hpf','presence']) ui[k].addEventListener('input', () => { store.set(k, +ui[k].value); refreshLabels(); applySound(); });
+  for (const k of ['key','scale','speed','shift','amount']) ui[k].addEventListener('input', () => { store.set(k, ui[k].value); refreshLabels(); applyFx(); });
+  ui.mode.addEventListener('change', () => { store.set('mode', ui.mode.value); stop(); refreshLabels(); });
+  ui.gate.addEventListener('change', () => store.set('gate', ui.gate.checked));
+  ui.clean.addEventListener('change', () => { store.set('clean', ui.clean.checked); const was = live; stopAll(); if (was) start(); });
 
   document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible' && live){
-      try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{}
-    }
+    if (document.visibilityState === 'visible' && live){ try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{} }
   });
+
+  refreshFxUI();
 })();
 </script>
 </body>
